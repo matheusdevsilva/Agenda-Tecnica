@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Painel NOC - Dark Calendar</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background: #111827;
+            color: #f9fafb;
+        }
+
+        .topo {
+            background: #1f2937;
+            display: flex;
+            justify-content: space-between;
+            padding: 15px 20px;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        #filtroData {
+            appearance: none;
+            -webkit-appearance: none;
+            background: #111827;
+            color: #f9fafb;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 13px;
+            outline: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        /* hover */
+        #filtroData:hover {
+            border-color: #4b5563;
+        }
+
+        #filtroData::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            opacity: 0.7;
+            cursor: pointer;
+        }
+
+        #filtroData::-webkit-calendar-picker-indicator:hover {
+            opacity: 1;
+        }
+
+        /* foco */
+
+        /* 🔥 Loading bar */
+        #loadingBar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            width: 0%;
+            background: #22c55e;
+            z-index: 9999;
+            transition: width 0.3s ease;
+        }
+
+        .calendar {
+            display: grid;
+            grid-template-columns: 70px repeat(8, 1fr);
+            gap: 1px;
+            background: #374151;
+            padding: 1px;
+            overflow-x: auto;
+        }
+
+        .hour,
+        .tecnico {
+            background: #1f2937;
+            padding: 6px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 12px;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+
+        .hour {
+            background: #111827;
+        }
+
+        .cell {
+            min-height: 50px;
+            background: #1f2937;
+            position: relative;
+        }
+
+        .event {
+            position: absolute;
+            left: 2px;
+            right: 2px;
+            border-radius: 6px;
+            padding: 2px 4px;
+            font-size: 11px;
+            color: white;
+            cursor: pointer;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            transition: transform 0.2s;
+        }
+
+        .event:hover {
+            transform: scale(1.05);
+            z-index: 5;
+        }
+
+        .status-0 {
+            background: #2563eb;
+        }
+
+        .status-1 {
+            background: #16a34a;
+        }
+
+        .status-2 {
+            background: #facc15;
+            color: black;
+        }
+
+        .status-3 {
+            background: #dc2626;
+        }
+
+        .tooltip {
+            position: fixed;
+            background: #374151;
+            color: #f9fafb;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            display: none;
+            z-index: 9999;
+            max-width: 220px;
+            white-space: normal;
+            word-break: break-word;
+            pointer-events: none;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+        }
+
+        #sem {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .sem-col {
+            background: #374151;
+            padding: 8px;
+            border-radius: 8px;
+            min-width: 120px;
+        }
+
+        .item-sem {
+            background: #2563eb;
+            padding: 4px;
+            margin-top: 4px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #f9fafb;
+        }
+
+        #legenda {
+            display: flex;
+            gap: 15px;
+            padding: 10px 20px;
+            background: #111827;
+            border-bottom: 1px solid #374151;
+            flex-wrap: wrap;
+        }
+
+        .leg-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+        }
+
+        .cor {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+
+        .motivo-backbone {
+            background: #dc2626 !important;
+            /* vermelho crítico */
+            color: white;
+            border: 1px solid #f87171;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 🔥 Loading -->
+    <div id="loadingBar"></div>
+
+    <div class="topo">
+        <div>
+            📡 Painel NOC - Dark Calendar
+        </div>
+        <div>
+            📅 Data: <input type="date" id="filtroData">
+        </div>
+    </div>
+    <div id="legenda">
+        <div class="leg-item"><span class="cor status-0"></span> Aberta</div>
+        <div class="leg-item"><span class="cor status-1"></span> Encerrada</div>
+        <div class="leg-item"><span class="cor status-2"></span> Em execução</div>
+    </div>
+
+    <div id="calendar" class="calendar"></div>
+
+    <h3 style="padding:10px;">📦 Sem Agendamento</h3>
+    <div id="sem"></div>
+
+    <script src="/socket.io/socket.io.js?v=2"></script>
+    <script>
+        const socket = io();
+        const tecnicos = ["Nelson", "Alex", "Emerson", "Ramon", "Claudinei", "Lucio", "Fernando", "Paulino"];
+        const HORA_INICIO = 8;
+        const HORA_FIM = 20;
+        const STATUS_MAP = { "Aberta": 0, "Encerrada": 1, "Em execução": 2, "Outro": 3 };
+
+        const filtroData = document.getElementById("filtroData");
+        const calendar = document.getElementById("calendar");
+        const loadingBar = document.getElementById("loadingBar");
+
+        const mapaCells = {};
+        const mapaSem = {};
+        let tooltip;
+        let intervaloAtual = null;
+
+        function startLoading() {
+            loadingBar.style.width = "30%";
+            setTimeout(() => loadingBar.style.width = "60%", 200);
+            setTimeout(() => loadingBar.style.width = "80%", 500);
+        }
+
+        function stopLoading() {
+            loadingBar.style.width = "100%";
+            setTimeout(() => loadingBar.style.width = "0%", 300);
+        }
+
+        function montarCalendar() {
+            calendar.innerHTML = "";
+
+            calendar.appendChild(createDiv("hour", ""));
+            tecnicos.forEach(t => calendar.appendChild(createDiv("hour", t)));
+
+            for (let h = HORA_INICIO; h <= HORA_FIM; h++) {
+                calendar.appendChild(createDiv("hour", `${h}:00`));
+
+                tecnicos.forEach(t => {
+                    const cell = createDiv("cell", "");
+                    calendar.appendChild(cell);
+
+                    if (!mapaCells[t]) mapaCells[t] = {};
+                    mapaCells[t][h] = cell;
+                });
+            }
+
+            const semDiv = document.getElementById("sem");
+            semDiv.innerHTML = "";
+
+            tecnicos.forEach(t => {
+                const col = document.createElement("div");
+                col.className = "sem-col";
+                col.id = "sem_" + t;
+                col.innerHTML = `<b>${t} (0)</b>`;
+                semDiv.appendChild(col);
+                mapaSem[t] = col;
+            });
+
+            tooltip = document.createElement("div");
+            tooltip.className = "tooltip";
+            document.body.appendChild(tooltip);
+        }
+
+        function createDiv(cls, text) {
+            const div = document.createElement("div");
+            div.className = cls;
+            div.innerText = text;
+            return div;
+        }
+
+        function limpar() {
+            Object.values(mapaCells).forEach(horas =>
+                Object.values(horas).forEach(c => c.innerHTML = "")
+            );
+
+            Object.values(mapaSem).forEach(col =>
+                col.innerHTML = `<b>${col.id.replace("sem_", "")} (0)</b>`
+            );
+        }
+
+        function aplicar(dados) {
+            limpar();
+
+            dados.forEach(os => {
+                const nome = os.tecnico?.split(" ")[0];
+                if (!nome || !tecnicos.includes(nome)) return;
+
+                const statusNum = STATUS_MAP[os.status] ?? 3;
+
+                if (!os.hora) {
+                    const div = document.createElement("div");
+                    div.className = "item-sem";
+                    div.innerText = os.cliente;
+
+                    mapaSem[nome].appendChild(div);
+
+                    const total = mapaSem[nome].querySelectorAll(".item-sem").length;
+                    mapaSem[nome].querySelector("b").innerText = `${nome} (${total})`;
+                    return;
+                }
+
+                const hora = parseInt(os.hora.split(":")[0]);
+                if (hora < HORA_INICIO || hora > HORA_FIM) return;
+
+                const cell = mapaCells[nome][hora];
+
+                const ev = document.createElement("div");
+                ev.className = `event status-${statusNum}`;
+                ev.innerText = os.cliente;
+
+                ev.addEventListener("mouseenter", (e) => {
+                    tooltip.style.display = "block";
+
+                    tooltip.innerHTML = `
+                        <b>${os.cliente}</b><br>
+                        <b>ID: ${os.idCliente}</b><br>
+                        Status: ${os.status}<br>
+                        Motivo: ${os.motivo}<br>
+                        Agendamento: ${os.hora || ''}<br>
+                        Chegada: ${os.Checkin || ''}<br>
+                        Finalizado: ${os.data_finalizado || ''}
+                    `;
+
+                    const rect = e.target.getBoundingClientRect();
+
+                    let left = rect.right + 10;
+                    let top = rect.top;
+
+                    const tooltipWidth = 220;
+                    const tooltipHeight = 130;
+
+                    if (left + tooltipWidth > window.innerWidth) {
+                        left = rect.left - tooltipWidth - 10;
+                    }
+
+                    if (top + tooltipHeight > window.innerHeight) {
+                        top = window.innerHeight - tooltipHeight - 10;
+                    }
+
+                    if (top < 0) top = 10;
+
+                    tooltip.style.left = left + "px";
+                    tooltip.style.top = top + "px";
+                });
+
+                ev.addEventListener("mouseleave", () => {
+                    tooltip.style.display = "none";
+                });
+
+                cell.appendChild(ev);
+            });
+        }
+
+        montarCalendar();
+
+        filtroData.addEventListener("change", (e) => {
+            const dataSelecionada = e.target.value;
+            if (!dataSelecionada) return;
+
+            if (intervaloAtual) clearInterval(intervaloAtual);
+
+            limpar();
+            startLoading();
+
+            const buscar = () => {
+                socket.emit("filtrarData", dataSelecionada);
+            };
+
+            buscar();
+
+            intervaloAtual = setInterval(buscar, 15000);
+        });
+
+        socket.on("agenda", (dados) => {
+            aplicar(dados);
+            stopLoading();
+        });
+    </script>
+</body>
+
+</html>
