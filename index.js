@@ -1,6 +1,6 @@
 import express from "express";
 import https from "https";
-import fs from "fs";
+
 import { Server } from "socket.io";
 import fetch from "node-fetch";
 import FormData from "form-data";
@@ -9,10 +9,7 @@ import FormData from "form-data";
 const app = express();
 
 
-const options = {
-  key: fs.readFileSync("key.pem"),   // chave privada
-  cert: fs.readFileSync("cert.pem")  // certificado público
-};
+
 
 const PORT = 8443; 
 const server = https.createServer(options, app);
