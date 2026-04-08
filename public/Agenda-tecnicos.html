@@ -202,12 +202,27 @@
             border: 1px solid #f87171;
             font-weight: bold;
         }
+
+        @keyframes piscar {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        .piscar {
+            animation: piscar 1s infinite;
+        }
     </style>
 </head>
 
 <body>
 
-    <!-- 🔥 Loading -->
     <div id="loadingBar"></div>
 
     <div class="topo">
@@ -222,6 +237,7 @@
         <div class="leg-item"><span class="cor status-0"></span> Aberta</div>
         <div class="leg-item"><span class="cor status-1"></span> Encerrada</div>
         <div class="leg-item"><span class="cor status-2"></span> Em execução</div>
+        <div class="leg-item"><span class="cor status-3"></span> Massivos</div>
     </div>
 
     <div id="calendar" class="calendar"></div>
@@ -337,15 +353,62 @@
 
                 const ev = document.createElement("div");
                 ev.className = `event status-${statusNum}`;
+
+
+                if (os.cliente && os.cliente.toLowerCase().startsWith("pop")) {
+                    ev.className = "event"; // mantém só a classe base
+                    ev.innerText = os.cliente;
+
+                    // 🎨 Fundo com gradiente e texto centralizado
+                    ev.style.background = "linear-gradient(90deg, rgba(255, 8, 8, 1) 1%, rgba(247, 30, 30, 1) 52%, rgba(115, 5, 5, 1) 100%)";
+                    ev.style.color = "#ffffff";
+                    ev.style.textAlign = "center";
+                    ev.style.fontWeight = "bold";
+                    ev.style.padding = "4px 6px";
+                    ev.style.borderRadius = "8px";
+                    ev.style.boxShadow = "0 4px 8px rgba(0,0,0,0.3)";
+                    ev.style.transition = "transform 0.2s, box-shadow 0.2s";
+
+
+                    switch (os.status) {
+                        case "Aberta":
+                            ev.style.boxShadow = "0 4px 12px rgba(37, 99, 235, 0.7)";
+                            break;
+                        case "Em execução":
+                            ev.style.boxShadow = "0 4px 12px rgba(250, 204, 21, 0.7)";
+                            break;
+                        case "Encerrada":
+                            ev.style.boxShadow = "0 4px 12px rgba(22, 163, 74, 0.7)";
+                            break;
+                        default:
+                            ev.style.boxShadow = "0 4px 10px rgba(255, 255, 255, 0.2)";
+                    }
+
+
+                    ev.addEventListener("mouseenter", () => {
+                        ev.style.transform = "scale(1.08)";
+
+                    });
+                    ev.addEventListener("mouseleave", () => {
+                        ev.style.transform = "scale(1)";
+
+                    });
+                }
+
                 ev.innerText = os.cliente;
 
+                ev.addEventListener("click", () => {
+                    navigator.clipboard.writeText(os.cliente)
+
+                });
                 ev.addEventListener("mouseenter", (e) => {
                     tooltip.style.display = "block";
-
                     tooltip.innerHTML = `
                         <b>${os.cliente}</b><br>
-                        <b>ID: ${os.idCliente}</b><br>
-                        Status: ${os.status}<br>
+                        <b>ID:</b> ${os.idCliente}<br>
+                        Pop: <b style ="color: #339999">${os.pop}</b> <br>
+                        Bairro: <b style ="color: #f0d442">${os.bairro}</b> <br>
+                        Status: <span style = "color:">${os.status}</span><br>
                         Motivo: ${os.motivo}<br>
                         Agendamento: ${os.hora || ''}<br>
                         Chegada: ${os.Checkin || ''}<br>
