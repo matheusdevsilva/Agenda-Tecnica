@@ -248,6 +248,7 @@
     <script src="/socket.io/socket.io.js?v=2"></script>
     <script>
         const socket = io();
+        const almocos = {};
         const tecnicos = ["Nelson", "Alex", "Emerson", "Ramon", "Claudinei", "Lucio", "Fernando", "Paulino"];
         const HORA_INICIO = 8;
         const HORA_FIM = 20;
@@ -261,6 +262,10 @@
         const mapaSem = {};
         let tooltip;
         let intervaloAtual = null;
+        let intervalosAlmoco = {}; // Mova para escopo global
+
+
+
 
         function startLoading() {
             loadingBar.style.width = "30%";
@@ -277,7 +282,48 @@
             calendar.innerHTML = "";
 
             calendar.appendChild(createDiv("hour", ""));
-            tecnicos.forEach(t => calendar.appendChild(createDiv("hour", t)));
+
+            tecnicos.forEach(t => {
+                const div = createDiv("hour", t);
+
+                div.dataset.tecnico = t; // 🔥 ESSENCIAL
+                div.addEventListener("click", () => {
+                    const emExecucao = intervalosAlmoco[t];
+
+                    // 🔴 SE JÁ ESTÁ RODANDO → PARAR
+                    if (emExecucao) {
+                        clearInterval(intervalosAlmoco[t]);
+                        delete intervalosAlmoco[t];
+
+                        div.innerText = t;
+                        div.style.color = "";
+                        div.classList.remove("piscar");
+
+                        socket.emit("toggleAlmoco", {
+                            tecnico: t,
+                            acao: "parar"
+                        });
+
+                        return;
+                    }
+
+                    // 🟢 SE NÃO ESTÁ → INICIAR
+                    const agora = Date.now();
+
+                    intervalosAlmoco[t] = iniciarCronometroHeader(div, agora, t);
+                    div.style.color = "#fbbf24";
+                    div.classList.add("piscar");
+
+                    socket.emit("toggleAlmoco", {
+                        tecnico: t,
+                        inicio: agora,
+                        acao: "iniciar"
+                    });
+                });
+                calendar.appendChild(div);
+
+
+            });
 
             for (let h = HORA_INICIO; h <= HORA_FIM; h++) {
                 calendar.appendChild(createDiv("hour", `${h}:00`));
@@ -465,10 +511,65 @@
             intervaloAtual = setInterval(buscar, 15000);
         });
 
+
         socket.on("agenda", (dados) => {
             aplicar(dados);
             stopLoading();
         });
+        socket.on("almocosUpdate", (dados) => {
+            almocosAtuais = dados;
+            aplicarAlmocos();
+        });
+
+
+
+        function iniciarCronometroHeader(elemento, inicio, nome) {
+            if (typeof inicio !== "number") {
+                inicio = new Date(inicio).getTime();
+            }
+
+            function atualizar() {
+                const diff = Math.max(0, Math.floor((Date.now() - inicio) / 1000));
+                const h = String(Math.floor(diff / 3600)).padStart(2, "0");
+                const m = String(Math.floor((diff % 3600) / 60)).padStart(2, "0");
+                const s = String(diff % 60).padStart(2, "0");
+
+                // ✅ Mantém o data-tecnico ATIVO
+                elemento.innerText = `${nome} 🍽️ ${h}:${m}:${s}`;
+                elemento.dataset.tecnico = nome; // 🔥 CRÍTICO!
+            }
+
+            atualizar();
+            return setInterval(atualizar, 1000);
+        }
+
+        function aplicarAlmocos() {
+            const headers = document.querySelectorAll(".hour[data-tecnico]");
+
+            headers.forEach(h => {
+                const nome = h.dataset.tecnico;
+                const emAlmoco = almocosAtuais[nome];
+
+                // ✅ Limpa cronômetro se não está em almoço
+                if (!emAlmoco) {
+                    if (intervalosAlmoco[nome]) {
+                        clearInterval(intervalosAlmoco[nome]);
+                        delete intervalosAlmoco[nome];
+                    }
+
+                    h.innerText = nome;
+                    h.style.color = "";
+                    h.classList.remove("piscar");
+                    return;
+                }
+
+                if (!intervalosAlmoco[nome]) {
+                    intervalosAlmoco[nome] = iniciarCronometroHeader(h, emAlmoco.inicio, nome);
+                    h.style.color = "#fbbf24";
+                    h.classList.add("piscar");
+                }
+            });
+        }
     </script>
 </body>
 
