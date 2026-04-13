@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Painel NOC - Dark Calendar</title>
+    <title>Painel NOC - Manutenção</title>
+    <link rel="shortcut icon" href="./imgs/logo.ico" type="image/x-icon">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -14,8 +15,9 @@
         }
 
         .topo {
-            background: #1f2937;
+            background: #0c131d;
             display: flex;
+
             justify-content: space-between;
             padding: 15px 20px;
             font-weight: bold;
@@ -51,23 +53,27 @@
             opacity: 1;
         }
 
-        /* foco */
 
-        /* 🔥 Loading bar */
         #loadingBar {
             position: fixed;
             top: 0;
             left: 0;
             height: 3px;
+            border-radius: 20px;
             width: 0%;
-            background: #22c55e;
+            background: #3AD6DE;
             z-index: 9999;
             transition: width 0.3s ease;
         }
 
+        .cometa {
+            background: #ffff;
+            width: 60vw;
+        }
+
         .calendar {
             display: grid;
-            grid-template-columns: 70px repeat(8, 1fr);
+            grid-template-columns: 70px repeat(9, 1fr);
             gap: 1px;
             background: #374151;
             padding: 1px;
@@ -130,7 +136,11 @@
         }
 
         .status-3 {
-            background: #dc2626;
+            background: #9800F7;
+        }
+
+        .status-4 {
+            background: #3AD6DE;
         }
 
         .tooltip {
@@ -218,26 +228,72 @@
         .piscar {
             animation: piscar 1s infinite;
         }
+
+        @keyframes neonPulse {
+            0% {
+                text-shadow: 0 0 3px rgba(58, 214, 222, 0.2),
+                    0 0 6px rgba(58, 214, 222, 0.1);
+                opacity: 0.85;
+            }
+
+            50% {
+                text-shadow: 0 0 6px rgba(58, 214, 222, 0.5),
+                    0 0 12px rgba(58, 214, 222, 0.25);
+                opacity: 1;
+            }
+
+            100% {
+                text-shadow: 0 0 3px rgba(58, 214, 222, 0.2),
+                    0 0 6px rgba(58, 214, 222, 0.1);
+                opacity: 0.85;
+            }
+        }
     </style>
 </head>
 
 <body>
 
-    <div id="loadingBar"></div>
+    <div id="loadingBar">
+        <div class="cometa"></div>
+    </div>
 
     <div class="topo">
         <div>
             📡 Painel NOC - Dark Calendar
         </div>
+        <div style="position: absolute; left: 48%; top: 0%; ">
+            <img src="./imgs/logo.png" width="60px" alt="logo" style="opacity: 100%;" />
+        </div>
+
         <div>
             📅 Data: <input type="date" id="filtroData">
         </div>
     </div>
-    <div id="legenda">
-        <div class="leg-item"><span class="cor status-0"></span> Aberta</div>
-        <div class="leg-item"><span class="cor status-1"></span> Encerrada</div>
-        <div class="leg-item"><span class="cor status-2"></span> Em execução</div>
-        <div class="leg-item"><span class="cor status-3"></span> Massivos</div>
+
+    <div id="legenda" style=" display: flex; justify-content: space-between;">
+        <div style="display: flex; gap: 20px;">
+            <div class="leg-item"><span class="cor status-0"></span> Aberta</div>
+            <div class="leg-item"><span class="cor status-1"></span> Encerrada</div>
+            <div class="leg-item"><span class="cor status-2"></span> Em execução</div>
+            <div class="leg-item"><span class="cor status-3"></span> Massivos</div>
+            <div class="leg-item"><span class="cor status-4"></span> Iracema </div>
+
+        </div>
+
+        <div style="font-size: 12px; text-align:center; color: #9ca3af;">
+            Desenvolvido por
+            <b>
+                <a href="https://github.com/matheusdevsilva" target="_blank" style="
+               color: #3AD6DE;
+               text-decoration: none;
+               animation: neonPulse 2.5s infinite ease-in-out;
+               text-shadow: 0 0 4px rgba(58, 214, 222, 0.25),
+                            0 0 8px rgba(58, 214, 222, 0.15);
+           ">
+                    @matheusdevsilva
+                </a>
+            </b>
+        </div>
     </div>
 
     <div id="calendar" class="calendar"></div>
@@ -249,7 +305,7 @@
     <script>
         const socket = io();
         const almocos = {};
-        const tecnicos = ["Nelson", "Alex", "Emerson", "Ramon", "Claudinei", "Lucio", "Fernando", "Paulino"];
+        const tecnicos = ["Alex", "Emerson", "Fernando", "Nelson", "Paulino", "Claudinei", "Lucio", "Ramon", "Leonardo"];
         const HORA_INICIO = 8;
         const HORA_FIM = 20;
         const STATUS_MAP = { "Aberta": 0, "Encerrada": 1, "Em execução": 2, "Outro": 3 };
@@ -285,12 +341,12 @@
 
             tecnicos.forEach(t => {
                 const div = createDiv("hour", t);
-
+                div.style.cursor = "pointer"
                 div.dataset.tecnico = t; // 🔥 ESSENCIAL
                 div.addEventListener("click", () => {
                     const emExecucao = intervalosAlmoco[t];
 
-                    // 🔴 SE JÁ ESTÁ RODANDO → PARAR
+
                     if (emExecucao) {
                         clearInterval(intervalosAlmoco[t]);
                         delete intervalosAlmoco[t];
@@ -320,6 +376,7 @@
                         acao: "iniciar"
                     });
                 });
+
                 calendar.appendChild(div);
 
 
@@ -400,13 +457,23 @@
                 const ev = document.createElement("div");
                 ev.className = `event status-${statusNum}`;
 
-
-                if (os.cliente && os.cliente.toLowerCase().startsWith("pop")) {
-                    ev.className = "event"; // mantém só a classe base
+                if (os.cliente && os.cliente.toLowerCase().startsWith("pop iracema")) {
+                    ev.style.background = "#3AD6DE";
+                    ev.style.color = "#ffffff";
+                    ev.style.textAlign = "center";
+                    ev.style.fontWeight = "bold";
+                    ev.style.padding = "4px 6px";
+                    ev.style.borderRadius = "8px";
+                    ev.style.boxShadow = "0 4px 8px rgba(0,0,0,0.3)";
+                    ev.style.transition = "transform 0.2s, box-shadow 0.2s";
+                }
+                else if (os.cliente && os.cliente.toLowerCase().startsWith("pop")) {
+                    ev.className = "event";
                     ev.innerText = os.cliente;
 
-                    // 🎨 Fundo com gradiente e texto centralizado
-                    ev.style.background = "linear-gradient(90deg, rgba(255, 8, 8, 1) 1%, rgba(247, 30, 30, 1) 52%, rgba(115, 5, 5, 1) 100%)";
+
+                    //linear-gradient(90deg, rgba(255, 8, 8, 1) 1%, rgba(247, 30, 30, 1) 52%, rgba(115, 5, 5, 1) 100%)
+                    ev.style.background = "#9800F7";
                     ev.style.color = "#ffffff";
                     ev.style.textAlign = "center";
                     ev.style.fontWeight = "bold";
@@ -463,21 +530,22 @@
 
                     const rect = e.target.getBoundingClientRect();
 
-                    let left = rect.right + 10;
-                    let top = rect.top;
-
                     const tooltipWidth = 220;
                     const tooltipHeight = 130;
+                    const margem = 20;
+
+                    let left = rect.right + margem;
+                    let top = rect.top;
 
                     if (left + tooltipWidth > window.innerWidth) {
-                        left = rect.left - tooltipWidth - 10;
+                        left = rect.left - tooltipWidth - margem;
                     }
 
                     if (top + tooltipHeight > window.innerHeight) {
-                        top = window.innerHeight - tooltipHeight - 10;
+                        top = window.innerHeight - tooltipHeight - margem;
                     }
 
-                    if (top < 0) top = 10;
+                    if (top < 0) top = margem;
 
                     tooltip.style.left = left + "px";
                     tooltip.style.top = top + "px";
@@ -487,8 +555,17 @@
                     tooltip.style.display = "none";
                 });
 
+
+                const quantidadeEventos = cell.querySelectorAll(".event").length;
+
+
+                ev.style.top = `${quantidadeEventos * 22}px`;
+
+
                 cell.appendChild(ev);
             });
+
+
         }
 
         montarCalendar();

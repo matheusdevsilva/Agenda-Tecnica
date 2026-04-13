@@ -14,7 +14,7 @@ const app = express();
 
 
 const options = {
-    key: fs.readFileSync("key.pem"),   // chave privada
+    key: fs.readFileSync("key.pem"),  
     cert: fs.readFileSync("cert.pem")  // certificado público
 };
 
@@ -41,6 +41,7 @@ const MAPA_TECNICOS = {
     "ramonalmeida": "Ramon",
     "Claudinei": "Claudinei",
     "LUCIO": "Lucio",
+    "Leonardosilva":"Leonardo"
 };
 
 
